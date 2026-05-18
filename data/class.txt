@@ -1,0 +1,10 @@
+sports
+entertainment
+property
+education
+fashion
+affairs
+game
+sociology
+technology
+economics

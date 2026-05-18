@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新闻分类预测系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result-box {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result-box.show {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-item {
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .result-label {
+            font-weight: bold;
+            color: #555;
+            display: inline-block;
+            width: 100px;
+        }
+
+        .result-value {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .error {
+            border-left-color: #e74c3c;
+        }
+
+        .error .result-value {
+            color: #e74c3c;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📰 新闻分类预测系统</h1>
+
+    <div class="input-group">
+        <label for="newsTitle">新闻标题：</label>
+        <input
+                type="text"
+                id="newsTitle"
+                placeholder="请输入新闻标题..."
+                onkeypress="if(event.keyCode===13) predict()"
+        >
+    </div>
+
+    <button onclick="predict()" id="predictBtn">开始预测</button>
+
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>正在预测中...</div>
+    </div>
+
+    <div class="result-box" id="resultBox">
+        <div class="result-item">
+            <span class="result-label">新闻标题：</span>
+            <span class="result-value" id="resultTitle"></span>
+        </div>
+        <div class="result-item">
+            <span class="result-label">预测类别：</span>
+            <span class="result-value" id="resultClass"></span>
+        </div>
+        <div class="result-item">
+            <span class="result-label">响应时间：</span>
+            <span class="result-value" id="responseTime"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function predict() {
+        const titleInput = document.getElementById('newsTitle');
+        const resultBox = document.getElementById('resultBox');
+        const loading = document.getElementById('loading');
+        const predictBtn = document.getElementById('predictBtn');
+
+        const title = titleInput.value.trim();
+
+        if (!title) {
+            alert('请输入新闻标题！');
+            return;
+        }
+
+        // 显示加载状态
+        loading.classList.add('show');
+        resultBox.classList.remove('show');
+        predictBtn.disabled = true;
+
+        const startTime = performance.now();
+
+        try {
+            const response = await fetch('http://localhost:5000/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title: title })
+            });
+
+            const endTime = performance.now();
+            const responseTime = (endTime - startTime).toFixed(2);
+
+            const data = await response.json();
+
+            if (data.error) {
+                showError(data.error);
+            } else {
+                showResult(data, responseTime);
+            }
+
+        } catch (error) {
+            const endTime = performance.now();
+            const responseTime = (endTime - startTime).toFixed(2);
+            showError(`请求失败: ${error.message} (${responseTime}ms)`);
+        } finally {
+            loading.classList.remove('show');
+            predictBtn.disabled = false;
+        }
+    }
+
+    function showResult(data, responseTime) {
+        document.getElementById('resultTitle').textContent = data.title;
+        document.getElementById('resultClass').textContent = data.pred_class;
+        document.getElementById('responseTime').textContent = `${responseTime} ms`;
+
+        const resultBox = document.getElementById('resultBox');
+        resultBox.classList.remove('error');
+        resultBox.classList.add('show');
+    }
+
+    function showError(message) {
+        document.getElementById('resultTitle').textContent = '-';
+        document.getElementById('resultClass').textContent = '-';
+        document.getElementById('responseTime').textContent = message;
+
+        const resultBox = document.getElementById('resultBox');
+        resultBox.classList.add('error', 'show');
+    }
+</script>
+</body>
+</html>
